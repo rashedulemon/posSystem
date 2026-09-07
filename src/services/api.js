@@ -34,6 +34,8 @@ if (!localStorage.getItem(MOCK_ORDERS_KEY)) {
   setMockData(MOCK_ORDERS_KEY, INITIAL_ORDERS);
 }
 
+const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 export const api = {
   // --- CATEGORIES ---
   async getCategories() {
@@ -70,12 +72,14 @@ export const api = {
 
   async saveProduct(product) {
     if (isSupabaseConfigured) {
-      if (product.id) {
+      const isUUID = product.id && isValidUUID(product.id);
+      if (isUUID) {
         const { data, error } = await supabase.from('products').update(product).eq('id', product.id).select().single();
         if (error) throw error;
         return data;
       } else {
-        const { data, error } = await supabase.from('products').insert([product]).select().single();
+        const { id, ...newProd } = product;
+        const { data, error } = await supabase.from('products').insert([newProd]).select().single();
         if (error) throw error;
         return data;
       }
@@ -100,6 +104,7 @@ export const api = {
 
   async deleteProduct(id) {
     if (isSupabaseConfigured) {
+      if (!isValidUUID(id)) return true;
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
       return true;
@@ -113,9 +118,11 @@ export const api = {
   // --- ORDERS & CHECKOUT (Atomic Transaction) ---
   async createOrder({ cashier, customerName, subtotal, discount, tax, total, paymentMethod, amountPaid, changeDue, items }) {
     if (isSupabaseConfigured) {
+      const cashierId = (cashier?.id && isValidUUID(cashier.id)) ? cashier.id : null;
+
       // Execute Atomic Supabase RPC Function
       const { data, error } = await supabase.rpc('create_order_atomic', {
-        p_cashier_id: cashier?.id || null,
+        p_cashier_id: cashierId,
         p_customer_name: customerName || 'Walk-in Customer',
         p_subtotal: subtotal,
         p_discount: discount,
@@ -125,7 +132,7 @@ export const api = {
         p_amount_paid: amountPaid,
         p_change_due: changeDue,
         p_items: items.map(item => ({
-          product_id: item.product.id,
+          product_id: (item.product?.id && isValidUUID(item.product.id)) ? item.product.id : null,
           product_name: item.product.name,
           qty: item.quantity,
           unit_price: item.product.price,

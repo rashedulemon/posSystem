@@ -156,24 +156,28 @@ BEGIN
     VALUES (v_order_id, p_payment_method, p_amount_paid, p_change_due);
 
     -- 3. Loop through order items, decrement stock, and insert order items
-    FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
-    LOOP
-        v_product_id := (v_item->>'product_id')::UUID;
+        v_product_id := CASE 
+            WHEN (v_item->>'product_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' 
+            THEN (v_item->>'product_id')::UUID 
+            ELSE NULL 
+        END;
         v_qty := (v_item->>'qty')::INT;
         v_unit_price := (v_item->>'unit_price')::NUMERIC;
         v_subtotal := (v_item->>'subtotal')::NUMERIC;
         v_product_name := (v_item->>'product_name')::TEXT;
 
-        -- Check current stock
-        SELECT stock_qty INTO v_curr_stock FROM public.products WHERE id = v_product_id FOR UPDATE;
-        IF v_curr_stock < v_qty THEN
-            RAISE EXCEPTION 'Insufficient stock for product % (Available: %, Requested: %)', v_product_name, v_curr_stock, v_qty;
-        END IF;
+        -- Check current stock if product exists in database
+        IF v_product_id IS NOT NULL THEN
+            SELECT stock_qty INTO v_curr_stock FROM public.products WHERE id = v_product_id FOR UPDATE;
+            IF v_curr_stock IS NOT NULL AND v_curr_stock < v_qty THEN
+                RAISE EXCEPTION 'Insufficient stock for product % (Available: %, Requested: %)', v_product_name, v_curr_stock, v_qty;
+            END IF;
 
-        -- Decrement stock
-        UPDATE public.products
-        SET stock_qty = stock_qty - v_qty
-        WHERE id = v_product_id;
+            -- Decrement stock
+            UPDATE public.products
+            SET stock_qty = stock_qty - v_qty
+            WHERE id = v_product_id;
+        END IF;
 
         -- Insert order item
         INSERT INTO public.order_items (order_id, product_id, product_name, qty, unit_price, subtotal)
