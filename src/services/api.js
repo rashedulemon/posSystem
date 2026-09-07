@@ -129,7 +129,7 @@ export const api = {
           product_name: item.product.name,
           qty: item.quantity,
           unit_price: item.product.price,
-          subtotal: item.product.price * item.quantity
+          subtotal: Number((item.product.price * item.quantity).toFixed(2))
         }))
       });
 

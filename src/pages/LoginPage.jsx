@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { ShoppingBag, Lock, Mail, ShieldCheck, UserCheck, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Lock, Mail, ShieldCheck, UserCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, loading } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('admin');
   const [errorMsg, setErrorMsg] = useState('');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center space-y-3 text-indigo-600 dark:text-indigo-400">
+        <Loader2 className="w-10 h-10 animate-spin" />
+        <p className="font-semibold text-sm">Authenticating Session...</p>
+      </div>
+    );
+  }
 
   // If user is already logged in, redirect immediately to POS main page
   if (user) {

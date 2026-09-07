@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -14,8 +15,17 @@ import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 
 function ProtectedLayout() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center space-y-3 text-indigo-600 dark:text-indigo-400">
+        <Loader2 className="w-10 h-10 animate-spin" />
+        <p className="font-semibold text-sm">Authenticating Session...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
