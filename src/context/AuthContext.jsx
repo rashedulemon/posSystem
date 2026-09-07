@@ -9,29 +9,9 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isSupabaseConfigured && supabase) {
-      // Supabase Auth listener
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          fetchUserProfile(session.user);
-        } else {
-          setUser(null);
-          setLoading(false);
-        }
-      });
+    let isMounted = true;
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          fetchUserProfile(session.user);
-        } else {
-          setUser(null);
-          setLoading(false);
-        }
-      });
-
-      return () => subscription.unsubscribe();
-    } else {
-      // Mock Auth initialization (Default to Admin user for full access)
+    const setFallbackUser = () => {
       const savedUser = localStorage.getItem('pos_current_user');
       if (savedUser) {
         try {
@@ -43,6 +23,44 @@ export function AuthProvider({ children }) {
         setUser(DEMO_USERS.admin);
       }
       setLoading(false);
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      // 1. Initial Session Retrieval
+      supabase.auth.getSession().then(({ data }) => {
+        if (!isMounted) return;
+        const session = data?.session;
+        if (session?.user) {
+          fetchUserProfile(session.user);
+        } else {
+          setFallbackUser();
+        }
+      }).catch((err) => {
+        console.warn('Supabase getSession error, falling back to local state:', err);
+        if (isMounted) setFallbackUser();
+      });
+
+      // 2. Auth State Change Listener
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          fetchUserProfile(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          localStorage.removeItem('pos_current_user');
+          setLoading(false);
+        } else {
+          // If no active session, retain current demo user or set fallback
+          setFallbackUser();
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        subscription?.unsubscribe();
+      };
+    } else {
+      setFallbackUser();
     }
   }, []);
 
